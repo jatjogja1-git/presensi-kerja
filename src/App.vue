@@ -82,11 +82,11 @@
             <v-card-title class="text-h5">Catat Kehadiran</v-card-title>
             <v-card-text>
               <div class="text-center my-4">
-                <v-btn color="success" class="mr-4" @click="checkIn" :loading="isCheckinLoading">
+                <v-btn color="success" class="mr-4" @click="openCamera('Masuk')" :loading="isCheckinLoading">
                   <v-icon left>mdi-login</v-icon>
                   Absen Masuk
                 </v-btn>
-                <v-btn color="red" @click="checkOut" :loading="isCheckoutLoading">
+                <v-btn color="red" @click="openCamera('Pulang')" :loading="isCheckoutLoading">
                   <v-icon left>mdi-logout</v-icon>
                   Absen Pulang
                 </v-btn>
@@ -104,6 +104,21 @@
             </v-card-text>
           </v-card>
         </div>
+
+        <!-- Dialog Kamera -->
+        <v-dialog v-model="cameraDialog" max-width="600px" persistent>
+          <v-card>
+            <v-card-title>Ambil Foto Kehadiran</v-card-title>
+            <v-card-text>
+              <video ref="cameraVideo" autoplay playsinline class="w-full h-auto rounded-lg shadow-lg"></video>
+            </v-card-text>
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn color="red" text @click="closeCamera">Batal</v-btn>
+              <v-btn color="success" @click="capturePhotoAndSave">Ambil Foto & Absen</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
 
         <!-- Halaman Riwayat Kehadiran -->
         <div v-if="isLoggedIn && currentPage === 'history'" class="my-12">
@@ -196,34 +211,25 @@ const drawer = ref(false);
 const currentPage = ref('attendance');
 const isLoggedIn = ref(false);
 const isAdmin = ref(false);
-const isRegistering = ref(false); // State baru untuk beralih antara login dan register
+const isRegistering = ref(false);
 const email = ref('');
 const password = ref('');
-const nama = ref(''); // State baru untuk nama
+const nama = ref('');
 const loginError = ref('');
 const registerError = ref('');
 const isLoginLoading = ref(false);
 const isRegisterLoading = ref(false);
 const user = ref(null);
-const userProfile = ref(null); // State baru untuk menyimpan profil pengguna yang sedang login
+const userProfile = ref(null);
 const search = ref('');
 
-// State untuk CRUD Pengguna
-const userDialog = ref(false);
-const users = ref([]);
-const editedUser = ref({});
-const defaultUser = { nama: '', email: '', password: '', isAdmin: false };
-const isSavingUser = ref(false);
-const userHeaders = [
-  { title: 'Nama', key: 'nama' },
-  { title: 'Email', key: 'email' },
-  { title: 'Peran', key: 'isAdmin' },
-  { title: 'Aksi', key: 'actions', sortable: false },
-];
-
-// State untuk Absensi
+// State untuk Kamera & Absensi
 const isCheckinLoading = ref(false);
 const isCheckoutLoading = ref(false);
+const cameraDialog = ref(false);
+const cameraVideo = ref(null);
+const videoStream = ref(null);
+const attendanceActionType = ref('');
 const location = ref(null);
 const photoPreviewUrl = ref('');
 const attendanceMessage = ref('');
@@ -237,6 +243,19 @@ const attendanceHeaders = [
   { title: 'Lokasi (Lintang)', key: 'latitude' },
   { title: 'Lokasi (Bujur)', key: 'longitude' },
   { title: 'Foto', key: 'photoUrl', value: (item) => item.photoUrl ? 'Ada' : 'Tidak Ada' },
+];
+
+// State untuk CRUD Pengguna
+const userDialog = ref(false);
+const users = ref([]);
+const editedUser = ref({});
+const defaultUser = { nama: '', email: '', password: '', isAdmin: false };
+const isSavingUser = ref(false);
+const userHeaders = [
+  { title: 'Nama', key: 'nama' },
+  { title: 'Email', key: 'email' },
+  { title: 'Peran', key: 'isAdmin' },
+  { title: 'Aksi', key: 'actions', sortable: false },
 ];
 
 // Computed Properties
@@ -259,7 +278,6 @@ onMounted(() => {
     if (currentUser) {
       user.value = currentUser;
       isLoggedIn.value = true;
-      // Ambil peran pengguna dan nama dari Firestore
       try {
         const userDocRef = doc(db, `artifacts/${appId}/users`, currentUser.uid);
         const userDocSnap = await getDoc(userDocRef);
@@ -293,7 +311,6 @@ const login = async () => {
   }
 };
 
-// Fungsi Pendaftaran
 const register = async () => {
   isRegisterLoading.value = true;
   registerError.value = '';
@@ -301,14 +318,12 @@ const register = async () => {
     const userCredential = await createUserWithEmailAndPassword(auth, email.value, password.value);
     const uid = userCredential.user.uid;
 
-    // Simpan data user tambahan ke Firestore
     await setDoc(doc(db, `artifacts/${appId}/users`, uid), {
       nama: nama.value,
       email: email.value,
-      isAdmin: false, // Default: user baru bukan admin
+      isAdmin: false,
     });
 
-    // Reset form
     email.value = '';
     password.value = '';
     nama.value = '';
@@ -321,7 +336,6 @@ const register = async () => {
   }
 };
 
-
 const logout = async () => {
   try {
     await signOut(auth);
@@ -330,7 +344,6 @@ const logout = async () => {
   }
 };
 
-// CRUD Pengguna (Hanya Admin)
 const fetchUsers = async () => {
   const querySnapshot = await getDocs(collection(db, `artifacts/${appId}/users`));
   users.value = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -345,20 +358,16 @@ const saveUser = async () => {
   isSavingUser.value = true;
   try {
     if (editedUser.value.id) {
-      // Edit Pengguna
       const userRef = doc(db, `artifacts/${appId}/users`, editedUser.value.id);
       await updateDoc(userRef, {
         nama: editedUser.value.nama,
         email: editedUser.value.email,
         isAdmin: editedUser.value.isAdmin,
       });
-      // Perbarui password jika ada
       if (editedUser.value.password) {
-        // Ini adalah langkah yang rumit. Anda tidak bisa mengubah password pengguna lain langsung.
-        // Untuk demo, kita akan lewati. Di produksi, Anda memerlukan cloud function.
+        // Implementasi perubahan password jika diperlukan
       }
     } else {
-      // Tambah Pengguna
       await createUserWithEmailAndPassword(auth, editedUser.value.email, editedUser.value.password);
       const newUser = {
         nama: editedUser.value.nama,
@@ -390,50 +399,62 @@ const deleteUser = async (item) => {
 };
 
 // ================================================================================================
-// 4. FUNGSI PENCATATAN KEHADIRAN & PULANG
+// 4. FUNGSI KAMERA & PENCATATAN KEHADIRAN
 // ================================================================================================
-const getLocation = () => {
-  return new Promise((resolve, reject) => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (error) => {
-          reject('Gagal mendapatkan lokasi. Pastikan izin lokasi diberikan.');
-          console.error('Error saat mendapatkan lokasi:', error);
-        }
-      );
-    } else {
-      reject('Geolocation tidak didukung oleh browser ini.');
-    }
-  });
-};
-
-const takePhoto = async () => {
-  // Simulasi pengambilan foto karena memerlukan Firebase Storage
-  return new Promise((resolve) => {
-    // Di lingkungan nyata, ini akan mengambil foto dan mengunggahnya ke Firebase Storage
-    console.log("Mengambil foto...");
-    const dummyPhoto = 'https://placehold.co/600x400/png?text=Foto Kehadiran';
-    photoPreviewUrl.value = dummyPhoto;
-    resolve(dummyPhoto);
-  });
-};
-
-const checkIn = async () => {
-  isCheckinLoading.value = true;
+const openCamera = async (type) => {
+  attendanceActionType.value = type;
   attendanceMessage.value = '';
-  attendanceAlertType.value = 'info';
+  photoPreviewUrl.value = '';
+  location.value = null;
 
   try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    videoStream.value = stream;
+    cameraVideo.value.srcObject = stream;
+    cameraDialog.value = true;
+  } catch (e) {
+    attendanceMessage.value = 'Gagal mengakses kamera. Pastikan Anda memberikan izin.';
+    attendanceAlertType.value = 'error';
+    console.error('Error saat mengakses kamera:', e);
+  }
+};
+
+const closeCamera = () => {
+  if (videoStream.value) {
+    videoStream.value.getTracks().forEach(track => track.stop());
+  }
+  cameraDialog.value = false;
+};
+
+const capturePhotoAndSave = async () => {
+  if (!videoStream.value) {
+    attendanceMessage.value = 'Kamera tidak aktif.';
+    attendanceAlertType.value = 'error';
+    return;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = cameraVideo.value.videoWidth;
+  canvas.height = cameraVideo.value.videoHeight;
+  const context = canvas.getContext('2d');
+  context.drawImage(cameraVideo.value, 0, 0, canvas.width, canvas.height);
+  const photoDataUrl = canvas.toDataURL('image/jpeg');
+  
+  photoPreviewUrl.value = photoDataUrl;
+  closeCamera();
+
+  // Memulai proses pencatatan absensi
+  if (attendanceActionType.value === 'Masuk') {
+    checkIn(photoDataUrl);
+  } else if (attendanceActionType.value === 'Pulang') {
+    checkOut(photoDataUrl);
+  }
+};
+
+const checkIn = async (photoUrl) => {
+  isCheckinLoading.value = true;
+  try {
     const userLocation = await getLocation();
-    const photoUrl = await takePhoto();
-    
-    // Gunakan nama lengkap dan email dari userProfile
     const userName = userProfile.value?.nama || user.value.email;
     const userEmail = userProfile.value?.email || user.value.email;
 
@@ -441,7 +462,7 @@ const checkIn = async () => {
       type: 'Masuk',
       userId: user.value.uid,
       userName: userName,
-      userEmail: userEmail, // Menambahkan email ke record absensi
+      userEmail: userEmail,
       latitude: userLocation.lat,
       longitude: userLocation.lng,
       photoUrl: photoUrl,
@@ -461,16 +482,10 @@ const checkIn = async () => {
   }
 };
 
-const checkOut = async () => {
+const checkOut = async (photoUrl) => {
   isCheckoutLoading.value = true;
-  attendanceMessage.value = '';
-  attendanceAlertType.value = 'info';
-
   try {
     const userLocation = await getLocation();
-    const photoUrl = await takePhoto();
-    
-    // Gunakan nama lengkap dan email dari userProfile
     const userName = userProfile.value?.nama || user.value.email;
     const userEmail = userProfile.value?.email || user.value.email;
 
@@ -478,7 +493,7 @@ const checkOut = async () => {
       type: 'Pulang',
       userId: user.value.uid,
       userName: userName,
-      userEmail: userEmail, // Menambahkan email ke record absensi
+      userEmail: userEmail,
       latitude: userLocation.lat,
       longitude: userLocation.lng,
       photoUrl: photoUrl,
@@ -496,6 +511,27 @@ const checkOut = async () => {
   } finally {
     isCheckoutLoading.value = false;
   }
+};
+
+const getLocation = () => {
+  return new Promise((resolve, reject) => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          reject('Gagal mendapatkan lokasi. Pastikan izin lokasi diberikan.');
+          console.error('Error saat mendapatkan lokasi:', error);
+        }
+      );
+    } else {
+      reject('Geolocation tidak didukung oleh browser ini.');
+    }
+  });
 };
 
 const fetchAttendanceRecords = async () => {
