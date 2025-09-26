@@ -110,6 +110,7 @@
           <v-card>
             <v-card-title>Ambil Foto Kehadiran</v-card-title>
             <v-card-text>
+              <!-- cameraVideo ref berada di sini -->
               <video ref="cameraVideo" autoplay playsinline class="w-full h-auto rounded-lg shadow-lg"></video>
             </v-card-text>
             <v-card-actions>
@@ -189,7 +190,7 @@
 // ================================================================================================
 // 1. IMPOR & KONFIGURASI
 // ================================================================================================
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onBeforeUnmount, nextTick } from 'vue'; // nextTick ditambahkan untuk memastikan DOM siap
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updatePassword } from 'firebase/auth';
 import { getFirestore, collection, doc, getDoc, setDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
@@ -298,6 +299,11 @@ onMounted(() => {
   });
 });
 
+// **HOOK VUE UNTUK CLEANUP**
+onBeforeUnmount(() => {
+  closeCamera();
+});
+
 const login = async () => {
   isLoginLoading.value = true;
   loginError.value = '';
@@ -401,6 +407,7 @@ const deleteUser = async (item) => {
 // ================================================================================================
 // 4. FUNGSI KAMERA & PENCATATAN KEHADIRAN
 // ================================================================================================
+// FUNGSI UTAMA UNTUK MENGAKSES KAMERA DENGAN FALLBACK LOGIC
 const openCamera = async (type) => {
   attendanceActionType.value = type;
   attendanceMessage.value = '';
@@ -408,12 +415,57 @@ const openCamera = async (type) => {
   location.value = null;
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    videoStream.value = stream;
-    cameraVideo.value.srcObject = stream;
+    // 1. BUKA DIALOG DULU agar elemen <video> terpasang di DOM
     cameraDialog.value = true;
+    await nextTick();
+
+    // Logika Fallback
+    let stream;
+    
+    // Coba 1: Prioritaskan kamera belakang ('environment')
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'environment' 
+            } 
+        });
+    } catch (e) {
+        // Jika gagal karena perangkat tidak ditemukan (NotFoundError), coba kamera default
+        if (e.name === 'NotFoundError') {
+            console.warn('NotFoundError (Kamera Belakang). Mencoba kamera default...');
+            
+            // Coba 2: Kamera default apa pun ('user' atau apa pun yang tersedia)
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: true 
+            });
+        } else {
+            // Jika error lain (NotAllowedError, SecurityError), lemparkan error tersebut
+            throw e;
+        }
+    }
+
+    videoStream.value = stream;
+
+    // 3. Pasang stream ke elemen video
+    if (cameraVideo.value) {
+        cameraVideo.value.srcObject = stream;
+    } else {
+        throw new Error("Elemen video kamera gagal dimuat setelah dialog dibuka.");
+    }
+    
   } catch (e) {
-    attendanceMessage.value = 'Gagal mengakses kamera. Pastikan Anda memberikan izin.';
+    // Tangani semua error kamera
+    closeCamera(); // Tutup dialog jika gagal
+    let errorMessage = '';
+    if (e.name === 'NotAllowedError') {
+        errorMessage = 'Akses kamera ditolak oleh pengguna atau sistem. Pastikan izin sudah diberikan.';
+    } else if (e.name === 'NotFoundError') {
+        errorMessage = 'Tidak ada perangkat kamera yang ditemukan di sistem Anda.';
+    } else {
+        errorMessage = 'Gagal mengakses kamera. Pastikan Anda menggunakan HTTPS. Detail error: ' + (e.name || e.message);
+    }
+    
+    attendanceMessage.value = errorMessage;
     attendanceAlertType.value = 'error';
     console.error('Error saat mengakses kamera:', e);
   }
@@ -422,6 +474,7 @@ const openCamera = async (type) => {
 const closeCamera = () => {
   if (videoStream.value) {
     videoStream.value.getTracks().forEach(track => track.stop());
+    videoStream.value = null;
   }
   cameraDialog.value = false;
 };
@@ -518,10 +571,12 @@ const getLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          resolve({
+          // Perbarui state lokasi agar terlihat di UI
+          location.value = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          });
+          };
+          resolve(location.value);
         },
         (error) => {
           reject('Gagal mendapatkan lokasi. Pastikan izin lokasi diberikan.');
@@ -601,4 +656,3 @@ const exportToPdf = (data, filename) => {
   max-width: 100%;
 }
 </style>
-
