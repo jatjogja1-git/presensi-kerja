@@ -458,19 +458,19 @@ const openCamera = async (type) => {
 
     let stream;
     
-    // Coba 1: Prioritaskan kamera belakang ('environment')
+    // Coba 1 (BARU): Prioritaskan kamera depan ('user')
     try {
         stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
-                facingMode: 'environment' 
+                facingMode: 'user' 
             } 
         });
     } catch (e) {
         // Jika gagal karena perangkat tidak ditemukan (NotFoundError), coba kamera default
         if (e.name === 'NotFoundError') {
-            console.warn('NotFoundError (Kamera Belakang). Mencoba kamera default...');
+            console.warn('NotFoundError (Kamera Depan). Mencoba kamera default...');
             
-            // Coba 2: Kamera default apa pun ('user' atau apa pun yang tersedia)
+            // Coba 2: Kamera default apa pun 
             stream = await navigator.mediaDevices.getUserMedia({ 
                 video: true 
             });
