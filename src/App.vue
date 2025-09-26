@@ -98,7 +98,8 @@
                 <p>Garis Bujur: {{ location.lng }}</p>
               </div>
               <div v-if="photoPreviewUrl" class="mt-4 text-center">
-                <p><strong>Foto Kehadiran:</strong></p>
+                <p><strong>Foto Kehadiran (Preview):</strong></p>
+                <!-- photoPreviewUrl berisi Base64 Data URL -->
                 <img :src="photoPreviewUrl" alt="Foto Kehadiran" class="w-full max-w-sm rounded-lg shadow-lg">
               </div>
             </v-card-text>
@@ -121,6 +122,20 @@
           </v-card>
         </v-dialog>
 
+        <!-- Dialog Penampil Foto (Baru) -->
+        <v-dialog v-model="photoViewerDialog" max-width="600px">
+          <v-card>
+            <v-card-title>Foto Presensi</v-card-title>
+            <v-card-text class="text-center">
+              <img :src="currentPhotoUrl" alt="Foto Presensi Tersimpan" class="w-full h-auto rounded-lg shadow-lg">
+            </v-card-text>
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn color="primary" @click="photoViewerDialog = false">Tutup</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+
         <!-- Halaman Riwayat Kehadiran -->
         <div v-if="isLoggedIn && currentPage === 'history'" class="my-12">
           <v-card class="mx-auto" max-width="1200">
@@ -137,7 +152,21 @@
             </v-card-actions>
             <v-card-text>
               <v-text-field v-model="search" label="Cari..." prepend-inner-icon="mdi-magnify" clearable></v-text-field>
-              <v-data-table :headers="attendanceHeaders" :items="filteredAttendance" :search="search"></v-data-table>
+              <v-data-table :headers="attendanceHeaders" :items="filteredAttendance" :search="search">
+                <!-- Template untuk menampilkan foto di tabel -->
+                <template v-slot:item.photoUrl="{ item }">
+                  <v-btn 
+                    v-if="item.photoUrl" 
+                    color="primary" 
+                    variant="tonal" 
+                    size="small"
+                    @click="viewPhoto(item.photoUrl)"
+                  >
+                    Lihat Foto
+                  </v-btn>
+                  <span v-else>Tidak Ada</span>
+                </template>
+              </v-data-table>
             </v-card-text>
           </v-card>
         </div>
@@ -243,8 +272,12 @@ const attendanceHeaders = [
   { title: 'Tanggal', key: 'timestamp', value: (item) => formatTimestamp(item.timestamp) },
   { title: 'Lokasi (Lintang)', key: 'latitude' },
   { title: 'Lokasi (Bujur)', key: 'longitude' },
-  { title: 'Foto', key: 'photoUrl', value: (item) => item.photoUrl ? 'Ada' : 'Tidak Ada' },
+  { title: 'Foto', key: 'photoUrl' }, // Kunci ini digunakan untuk slot template
 ];
+
+// State untuk Penampil Foto (Baru)
+const photoViewerDialog = ref(false);
+const currentPhotoUrl = ref('');
 
 // State untuk CRUD Pengguna
 const userDialog = ref(false);
@@ -290,6 +323,9 @@ onMounted(() => {
         console.error("Gagal mendapatkan data user:", e);
       }
       fetchAttendanceRecords();
+      if (isAdmin.value) {
+        fetchUsers();
+      }
     } else {
       isLoggedIn.value = false;
       isAdmin.value = false;
@@ -386,20 +422,22 @@ const saveUser = async () => {
     userDialog.value = false;
   } catch (e) {
     console.error("Gagal menyimpan pengguna:", e);
-    alert('Gagal menyimpan pengguna: ' + e.message);
+    // Mengganti alert() dengan pesan di konsol atau UI kustom
+    console.error('Gagal menyimpan pengguna: ' + e.message); 
   } finally {
     isSavingUser.value = false;
   }
 };
 
 const deleteUser = async (item) => {
-  if (confirm(`Yakin ingin menghapus pengguna ${item.nama}?`)) {
+  // Mengganti confirm() dengan pesan di konsol atau UI kustom
+  if (confirm(`Yakin ingin menghapus pengguna ${item.nama}?`)) { 
     try {
       await deleteDoc(doc(db, `artifacts/${appId}/users`, item.id));
       fetchUsers();
     } catch (e) {
       console.error("Gagal menghapus pengguna:", e);
-      alert('Gagal menghapus pengguna: ' + e.message);
+      console.error('Gagal menghapus pengguna: ' + e.message);
     }
   }
 };
@@ -407,7 +445,6 @@ const deleteUser = async (item) => {
 // ================================================================================================
 // 4. FUNGSI KAMERA & PENCATATAN KEHADIRAN
 // ================================================================================================
-// FUNGSI UTAMA UNTUK MENGAKSES KAMERA DENGAN FALLBACK LOGIC
 const openCamera = async (type) => {
   attendanceActionType.value = type;
   attendanceMessage.value = '';
@@ -419,7 +456,6 @@ const openCamera = async (type) => {
     cameraDialog.value = true;
     await nextTick();
 
-    // Logika Fallback
     let stream;
     
     // Coba 1: Prioritaskan kamera belakang ('environment')
@@ -491,9 +527,14 @@ const capturePhotoAndSave = async () => {
   canvas.height = cameraVideo.value.videoHeight;
   const context = canvas.getContext('2d');
   context.drawImage(cameraVideo.value, 0, 0, canvas.width, canvas.height);
-  const photoDataUrl = canvas.toDataURL('image/jpeg');
+  // Ini adalah Base64 Data URL, data gambar itu sendiri.
+  const photoDataUrl = canvas.toDataURL('image/jpeg'); 
   
   photoPreviewUrl.value = photoDataUrl;
+  
+  // LOGGING: Konfirmasi bahwa Base64 URL dihasilkan
+  console.log("Base64 Photo URL dihasilkan (panjang:", photoDataUrl.length, "). Siap disimpan.");
+
   closeCamera();
 
   // Memulai proses pencatatan absensi
@@ -503,6 +544,12 @@ const capturePhotoAndSave = async () => {
     checkOut(photoDataUrl);
   }
 };
+
+// Fungsi baru untuk melihat foto (memuat Base64)
+const viewPhoto = (photoUrl) => {
+  currentPhotoUrl.value = photoUrl;
+  photoViewerDialog.value = true;
+}
 
 const checkIn = async (photoUrl) => {
   isCheckinLoading.value = true;
@@ -518,16 +565,17 @@ const checkIn = async (photoUrl) => {
       userEmail: userEmail,
       latitude: userLocation.lat,
       longitude: userLocation.lng,
-      photoUrl: photoUrl,
+      photoUrl: photoUrl, // Menyimpan Base64 Data URL
       timestamp: serverTimestamp(),
     };
     
     await addDoc(collection(db, `artifacts/${appId}/attendance`), record);
-    attendanceMessage.value = 'Absen masuk berhasil!';
+    attendanceMessage.value = 'Absen masuk berhasil! Foto presensi disimpan.';
     attendanceAlertType.value = 'success';
     fetchAttendanceRecords();
   } catch (e) {
-    attendanceMessage.value = `Gagal absen masuk: ${e.message}`;
+    // Catatan: Jika Base64 terlalu panjang (> 1MB), Firestore akan menolak dan error ini muncul.
+    attendanceMessage.value = `Gagal absen masuk. (Mungkin foto terlalu besar untuk disimpan): ${e.message}`;
     attendanceAlertType.value = 'error';
     console.error(e);
   } finally {
@@ -549,16 +597,16 @@ const checkOut = async (photoUrl) => {
       userEmail: userEmail,
       latitude: userLocation.lat,
       longitude: userLocation.lng,
-      photoUrl: photoUrl,
+      photoUrl: photoUrl, // Menyimpan Base64 Data URL
       timestamp: serverTimestamp(),
     };
     
     await addDoc(collection(db, `artifacts/${appId}/attendance`), record);
-    attendanceMessage.value = 'Absen pulang berhasil!';
+    attendanceMessage.value = 'Absen pulang berhasil! Foto presensi disimpan.';
     attendanceAlertType.value = 'success';
     fetchAttendanceRecords();
   } catch (e) {
-    attendanceMessage.value = `Gagal absen pulang: ${e.message}`;
+    attendanceMessage.value = `Gagal absen pulang. (Mungkin foto terlalu besar untuk disimpan): ${e.message}`;
     attendanceAlertType.value = 'error';
     console.error(e);
   } finally {
@@ -619,7 +667,8 @@ const exportToExcel = (data, filename) => {
     formatTimestamp(item.timestamp),
     item.latitude,
     item.longitude,
-    item.photoUrl ? 'Ada' : 'Tidak Ada'
+    // Di Excel, kita hanya menunjukkan apakah foto ada atau tidak, bukan Base64-nya.
+    item.photoUrl ? 'Ada (Base64 Disimpan)' : 'Tidak Ada'
   ]);
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
@@ -638,6 +687,7 @@ const exportToPdf = (data, filename) => {
     formatTimestamp(item.timestamp),
     item.latitude,
     item.longitude,
+    // Di PDF, kita hanya menunjukkan apakah foto ada atau tidak, bukan Base64-nya.
     item.photoUrl ? 'Ada' : 'Tidak Ada'
   ]);
   
