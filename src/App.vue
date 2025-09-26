@@ -19,6 +19,7 @@
       </v-list-item>
       <v-divider></v-divider>
       <v-list dense nav>
+        <!-- Desktop: Tidak perlu menutup drawer karena permanent -->
         <v-list-item @click="currentPage = 'attendance'" :class="{'bg-primary text-white': currentPage === 'attendance'}">
           <v-list-item-icon><v-icon>mdi-calendar-clock</v-icon></v-list-item-icon>
           <v-list-item-title>Absensi</v-list-item-title>
@@ -45,19 +46,20 @@
       app
     >
       <v-list dense nav>
-        <v-list-item @click="currentPage = 'attendance'; drawer = false" :class="{'bg-primary text-white': currentPage === 'attendance'}">
+        <!-- Mobile: Menambahkan 'drawer = false' setelah setiap klik untuk menutup menu -->
+        <v-list-item @click="currentPage = 'attendance'; **drawer = false**" :class="{'bg-primary text-white': currentPage === 'attendance'}">
           <v-list-item-icon><v-icon>mdi-calendar-clock</v-icon></v-list-item-icon>
           <v-list-item-title>Absensi</v-list-item-title>
         </v-list-item>
-        <v-list-item @click="currentPage = 'history'; drawer = false" :class="{'bg-primary text-white': currentPage === 'history'}">
+        <v-list-item @click="currentPage = 'history'; **drawer = false**" :class="{'bg-primary text-white': currentPage === 'history'}">
           <v-list-item-icon><v-icon>mdi-history</v-icon></v-list-item-icon>
           <v-list-item-title>Riwayat Kehadiran</v-list-item-title>
         </v-list-item>
-        <v-list-item v-if="isAdmin" @click="currentPage = 'users'; drawer = false" :class="{'bg-primary text-white': currentPage === 'users'}">
+        <v-list-item v-if="isAdmin" @click="currentPage = 'users'; **drawer = false**" :class="{'bg-primary text-white': currentPage === 'users'}">
           <v-list-item-icon><v-icon>mdi-account-group</v-icon></v-list-item-icon>
           <v-list-item-title>Manajemen User</v-list-item-title>
         </v-list-item>
-        <v-list-item @click="logout" color="red">
+        <v-list-item @click="logout; **drawer = false**" color="red">
           <v-list-item-icon><v-icon>mdi-logout</v-icon></v-list-item-icon>
           <v-list-item-title>Keluar</v-list-item-title>
         </v-list-item>
