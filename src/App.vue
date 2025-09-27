@@ -73,6 +73,7 @@
         v-if="isMobile && isLoggedIn" 
         @click="drawer = !drawer"
       ></v-app-bar-nav-icon>
+      
       <v-toolbar-title>Aplikasi Presensi</v-toolbar-title>
       <v-spacer></v-spacer>
       <!-- Tampilkan tombol keluar hanya pada desktop, karena di mobile sudah ada di drawer -->
