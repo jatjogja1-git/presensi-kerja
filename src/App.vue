@@ -1,66 +1,18 @@
 <template>
   <v-app>
-    <!-- Drawer Navigasi untuk Desktop (Permanent) -->
-    <v-navigation-drawer 
-      v-if="!isMobile && isLoggedIn"
-      v-model="drawer" 
-      app 
-      permanent
-      width="250"
-      color="blue-grey-lighten-5"
-    >
-      <v-list-item class="pa-4">
-        <v-list-item-title class="text-h6 font-weight-bold">
-          Menu Aplikasi
-        </v-list-item-title>
-        <v-list-item-subtitle>
-          Navigasi Cepat
-        </v-list-item-subtitle>
-      </v-list-item>
-      <v-divider></v-divider>
-      <v-list dense nav>
-        <!-- Desktop: Tidak perlu menutup drawer karena permanent -->
-        <v-list-item @click="currentPage = 'attendance'" :class="{'bg-primary text-white': currentPage === 'attendance'}">
-          <v-list-item-icon><v-icon>mdi-calendar-clock</v-icon></v-list-item-icon>
+    <!-- Drawer Navigasi -->
+    <v-navigation-drawer v-model="drawer" app>
+      <v-list dense>
+        <v-list-item @click="currentPage = 'attendance'">
           <v-list-item-title>Absensi</v-list-item-title>
         </v-list-item>
-        <v-list-item @click="currentPage = 'history'" :class="{'bg-primary text-white': currentPage === 'history'}">
-          <v-list-item-icon><v-icon>mdi-history</v-icon></v-list-item-icon>
+        <v-list-item @click="currentPage = 'history'">
           <v-list-item-title>Riwayat Kehadiran</v-list-item-title>
         </v-list-item>
-        <v-list-item v-if="isAdmin" @click="currentPage = 'users'" :class="{'bg-primary text-white': currentPage === 'users'}">
-          <v-list-item-icon><v-icon>mdi-account-group</v-icon></v-list-item-icon>
+        <v-list-item v-if="isAdmin" @click="currentPage = 'users'">
           <v-list-item-title>Manajemen User</v-list-item-title>
         </v-list-item>
-        <v-list-item @click="logout" color="red">
-          <v-list-item-icon><v-icon>mdi-logout</v-icon></v-list-item-icon>
-          <v-list-item-title>Keluar</v-list-item-title>
-        </v-list-item>
-      </v-list>
-    </v-navigation-drawer>
-    
-    <!-- Drawer Navigasi untuk Mobile (Temporary/Geser) -->
-    <v-navigation-drawer 
-      v-else-if="isMobile && isLoggedIn"
-      v-model="drawer" 
-      app
-    >
-      <v-list dense nav>
-        <!-- Mobile: Menambahkan 'drawer = false' setelah setiap klik untuk menutup menu -->
-        <v-list-item @click="currentPage = 'attendance'; **drawer = false**" :class="{'bg-primary text-white': currentPage === 'attendance'}">
-          <v-list-item-icon><v-icon>mdi-calendar-clock</v-icon></v-list-item-icon>
-          <v-list-item-title>Absensi</v-list-item-title>
-        </v-list-item>
-        <v-list-item @click="currentPage = 'history'; **drawer = false**" :class="{'bg-primary text-white': currentPage === 'history'}">
-          <v-list-item-icon><v-icon>mdi-history</v-icon></v-list-item-icon>
-          <v-list-item-title>Riwayat Kehadiran</v-list-item-title>
-        </v-list-item>
-        <v-list-item v-if="isAdmin" @click="currentPage = 'users'; **drawer = false**" :class="{'bg-primary text-white': currentPage === 'users'}">
-          <v-list-item-icon><v-icon>mdi-account-group</v-icon></v-list-item-icon>
-          <v-list-item-title>Manajemen User</v-list-item-title>
-        </v-list-item>
-        <v-list-item @click="logout; **drawer = false**" color="red">
-          <v-list-item-icon><v-icon>mdi-logout</v-icon></v-list-item-icon>
+        <v-list-item @click="logout">
           <v-list-item-title>Keluar</v-list-item-title>
         </v-list-item>
       </v-list>
@@ -68,22 +20,16 @@
 
     <!-- App Bar -->
     <v-app-bar app color="primary" dark>
-      <!-- Tampilkan Hamburger hanya jika Mobile dan sedang Login -->
-      <v-app-bar-nav-icon 
-        v-if="isMobile && isLoggedIn" 
-        @click="drawer = !drawer"
-      ></v-app-bar-nav-icon>
-      
-      <v-toolbar-title>Aplikasi Presensi</v-toolbar-title>
+      <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
+      <v-toolbar-title>Aplikasi Absensi</v-toolbar-title>
       <v-spacer></v-spacer>
-      <!-- Tampilkan tombol keluar hanya pada desktop, karena di mobile sudah ada di drawer -->
-      <v-btn v-if="isLoggedIn && !isMobile" icon @click="logout">
+      <v-btn v-if="isLoggedIn" icon @click="logout">
         <v-icon>mdi-logout</v-icon>
       </v-btn>
     </v-app-bar>
 
-    <!-- Konten Utama: Menggunakan padding-left dinamis untuk Desktop -->
-    <v-main :style="mainContentStyle" class="bg-blue-grey-lighten-5">
+    <!-- Konten Utama -->
+    <v-main class="bg-blue-grey-lighten-5">
       <v-container fluid>
         <!-- Halaman Login/Register -->
         <v-card v-if="!isLoggedIn" class="mx-auto my-12" max-width="400">
@@ -273,7 +219,7 @@
 // ================================================================================================
 // 1. IMPOR & KONFIGURASI
 // ================================================================================================
-import { ref, onMounted, computed, onBeforeUnmount, nextTick } from 'vue'; 
+import { ref, onMounted, computed, onBeforeUnmount, nextTick } from 'vue'; // nextTick ditambahkan untuk memastikan DOM siap
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updatePassword } from 'firebase/auth';
 import { getFirestore, collection, doc, getDoc, setDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
@@ -283,20 +229,15 @@ import 'jspdf-autotable';
 import autoTable from 'jspdf-autotable';
 
 // Konfigurasi Firebase Anda
-// Pastikan konfigurasi ini dimuat di lingkungan Canvas
-const __firebase_config = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+import { auth, db } from './firebase/config.js';
 
 // Ganti "YOUR_PROJECT_ID" dengan Project ID asli Anda dari Firebase Console
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
+const appId = "aplikasi-absensi-37462"; 
 
 // ================================================================================================
 // 2. STATE APLIKASI
 // ================================================================================================
-const drawer = ref(true); // Default true agar desktop mode langsung terbuka
+const drawer = ref(false);
 const currentPage = ref('attendance');
 const isLoggedIn = ref(false);
 const isAdmin = ref(false);
@@ -311,11 +252,6 @@ const isRegisterLoading = ref(false);
 const user = ref(null);
 const userProfile = ref(null);
 const search = ref('');
-
-// State Responsivitas (BARU)
-const isMobile = ref(false);
-const DRAWER_WIDTH = 250;
-const MOBILE_BREAKPOINT = 960; // Standar Vuetify 'lg' breakpoint
 
 // State untuk Kamera & Absensi
 const isCheckinLoading = ref(false);
@@ -336,10 +272,10 @@ const attendanceHeaders = [
   { title: 'Tanggal', key: 'timestamp', value: (item) => formatTimestamp(item.timestamp) },
   { title: 'Lokasi (Lintang)', key: 'latitude' },
   { title: 'Lokasi (Bujur)', key: 'longitude' },
-  { title: 'Foto', key: 'photoUrl' }, 
+  { title: 'Foto', key: 'photoUrl' }, // Kunci ini digunakan untuk slot template
 ];
 
-// State untuk Penampil Foto 
+// State untuk Penampil Foto (Baru)
 const photoViewerDialog = ref(false);
 const currentPhotoUrl = ref('');
 
@@ -368,31 +304,10 @@ const filteredAttendance = computed(() => {
   );
 });
 
-// Style konten utama untuk menyeimbangkan drawer permanen (BARU)
-const mainContentStyle = computed(() => {
-  if (isLoggedIn.value && !isMobile.value) {
-    return { 'padding-left': `${DRAWER_WIDTH}px` };
-  }
-  return {};
-});
-
 // ================================================================================================
 // 3. FUNGSI OTENTIKASI & MANAJEMEN USER
 // ================================================================================================
-// Fungsi Pendeteksi Ukuran Layar (BARU)
-const checkMobile = () => {
-  isMobile.value = window.innerWidth < MOBILE_BREAKPOINT;
-  // Jika berubah ke desktop, pastikan drawer tertutup agar tidak mengganggu layout
-  if (!isMobile.value) {
-    drawer.value = true;
-  } else {
-    // Di mobile, drawer harus dimulai tertutup
-    drawer.value = false;
-  }
-};
-
 onMounted(() => {
-  // Setup Autentikasi
   onAuthStateChanged(auth, async (currentUser) => {
     if (currentUser) {
       user.value = currentUser;
@@ -418,16 +333,11 @@ onMounted(() => {
       userProfile.value = null;
     }
   });
-
-  // Setup Responsivitas
-  checkMobile();
-  window.addEventListener('resize', checkMobile);
 });
 
 // **HOOK VUE UNTUK CLEANUP**
 onBeforeUnmount(() => {
   closeCamera();
-  window.removeEventListener('resize', checkMobile); // Hapus listener saat komponen dilepas (BARU)
 });
 
 const login = async () => {
@@ -548,7 +458,7 @@ const openCamera = async (type) => {
 
     let stream;
     
-    // Coba 1: Prioritaskan kamera depan ('user')
+    // Coba 1 (BARU): Prioritaskan kamera depan ('user')
     try {
         stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
