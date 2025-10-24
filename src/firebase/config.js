@@ -5,12 +5,12 @@ import { getFirestore } from 'firebase/firestore';
 
 // Salin dan tempel konfigurasi Anda di sini
 const firebaseConfig = {
-  apiKey: "AIzaSyA7DSLwbd1ouRTHhL5V2-2NrzqiWHbt_IM",
-  authDomain: "klarifikasi-bphtb1.firebaseapp.com",
-  projectId: "klarifikasi-bphtb1",
-  storageBucket: "klarifikasi-bphtb1.firebasestorage.app",
-  messagingSenderId: "509890878115",
-  appId: "1:509890878115:web:18703b4ea3d01d7f303d16"};
+  apiKey: "AIzaSyDGa_9wR2WISxDQciiaABFom5Z2Q9OvqNg",
+    authDomain: "aplikasi-presensi-bkad.firebaseapp.com",
+    projectId: "aplikasi-presensi-bkad",
+    storageBucket: "aplikasi-presensi-bkad.firebasestorage.app",
+    messagingSenderId: "803874857669",
+    appId: "1:803874857669:web:449149494d80ce0e19c6ac"};
 
 // Inisialisasi Firebase
 const app = initializeApp(firebaseConfig);
