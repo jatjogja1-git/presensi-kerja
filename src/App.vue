@@ -4,10 +4,10 @@
       <v-navigation-drawer v-model="drawer" app>
         <v-list dense>
           <v-list-item @click="currentPage = 'attendance'">
-            <v-list-item-title>Absensi</v-list-item-title>
+            <v-list-item-title>Klarifikasi</v-list-item-title>
           </v-list-item>
           <v-list-item @click="currentPage = 'history'">
-            <v-list-item-title>Riwayat Kehadiran</v-list-item-title>
+            <v-list-item-title>Riwayat Klarifikasi</v-list-item-title>
           </v-list-item>
           <v-list-item v-if="isAdmin" @click="currentPage = 'users'">
             <v-list-item-title>Manajemen User</v-list-item-title>
@@ -21,7 +21,7 @@
       <!-- App Bar -->
       <v-app-bar app color="primary" dark>
         <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-        <v-toolbar-title>Aplikasi Absensi</v-toolbar-title>
+        <v-toolbar-title>Aplikasi Klarifikasi</v-toolbar-title>
         <v-spacer></v-spacer>
         <v-btn v-if="isLoggedIn" icon @click="logout">
           <v-icon>mdi-logout</v-icon>
@@ -139,7 +139,7 @@
           <!-- Halaman Riwayat Kehadiran -->
           <div v-if="isLoggedIn && currentPage === 'history'" class="my-12">
             <v-card class="mx-auto" max-width="1200">
-              <v-card-title class="text-h5">Riwayat Kehadiran</v-card-title>
+              <v-card-title class="text-h5">Riwayat Klarifikasi</v-card-title>
               <v-card-actions class="d-flex justify-end">
                 <v-btn color="success" class="mr-2" @click="exportToExcel(filteredAttendance, 'Riwayat Kehadiran')">
                   <v-icon left>mdi-file-excel</v-icon>
@@ -268,6 +268,8 @@
   const attendanceHeaders = [
     { title: 'No.', key: 'number', width: '50px' }, // Lebar kolom bisa disesuaikan
     { title: 'Nama Lengkap', key: 'userName' },
+    { title: 'Nomor Bphtb', key: 'userBphtb' },
+    { title: 'Keterangan', key: 'userNote' },
     { title: 'Email', key: 'userEmail' },
     { title: 'Jenis', key: 'type' },
     { title: 'Tanggal', key: 'timestamp', value: (item) => formatTimestamp(item.timestamp) },
@@ -543,7 +545,7 @@
     closeCamera();
   
     // Memulai proses pencatatan absensi
-    if (attendanceActionType.value === 'Masuk') {
+    if (attendanceActionType.value === 'Klarifikasi') {
       checkIn(photoDataUrl);
     } else if (attendanceActionType.value === 'Pulang') {
       checkOut(photoDataUrl);
@@ -564,7 +566,7 @@
       const userEmail = userProfile.value?.email || user.value.email;
   
       const record = {
-        type: 'Masuk',
+        type: 'Klarifikasi',
         userId: user.value.uid,
         userName: userName,
         userEmail: userEmail,
@@ -575,12 +577,12 @@
       };
       
       await addDoc(collection(db, `artifacts/${appId}/attendance`), record);
-      attendanceMessage.value = 'Absen masuk berhasil! Foto presensi disimpan.';
+      attendanceMessage.value = 'Klarifikasi masuk berhasil! Foto klarifikasi disimpan.';
       attendanceAlertType.value = 'success';
       fetchAttendanceRecords();
     } catch (e) {
       // Catatan: Jika Base64 terlalu panjang (> 1MB), Firestore akan menolak dan error ini muncul.
-      attendanceMessage.value = `Gagal absen masuk. (Mungkin foto terlalu besar untuk disimpan): ${e.message}`;
+      attendanceMessage.value = `Gagal klarifikasi masuk. (Mungkin foto terlalu besar untuk disimpan): ${e.message}`;
       attendanceAlertType.value = 'error';
       console.error(e);
     } finally {
@@ -656,7 +658,7 @@
       });
    
   } catch (e) {
-      console.error("Gagal mengambil riwayat kehadiran:", e);
+      console.error("Gagal mengambil riwayat klarifikasi:", e);
     }
   };
   
